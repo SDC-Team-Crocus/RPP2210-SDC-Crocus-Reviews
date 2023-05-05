@@ -28,7 +28,7 @@ exports.getProductReviews = async (req, res) => {
   // console.log('finalReviewResponse', finalReviewResponse)
   res.status(200).send(finalReviewResponse);
   } catch (err) {
-    console.log(err);
+    // console.log(err);
     res.send(err);
   }
 };
@@ -64,7 +64,7 @@ exports.getProductMeta = async (req, res) => {
 
   res.status(200).send(finalMetaResponse);
   } catch (err) {
-    console.log(err);
+    // console.log(err);
     res.send(err);
   }
 };
@@ -110,7 +110,8 @@ exports.postNewReview = async (req, res) => {
     );
   };
   // console.log('reviews characs insert success!')
-  res.status(201).end('Your review has been successfully posted!');
+  res.sendStatus(201);
+  // res.status(201).send('Your review has been successfully posted!');
  } catch (err) {
   console.log(err);
   res.send(err);
@@ -125,7 +126,7 @@ exports.updateReviewHelpfulness = async (req, res) => {
       `UPDATE reviews SET helpfulness = helpfulness + 1
       WHERE id = '${id}';`
     );
-    res.status(204).end();
+    res.sendStatus(204);
   } catch (err) {
     console.log(err);
     res.send(err);
@@ -139,7 +140,7 @@ exports.reportReview = async (req, res) => {
       `UPDATE reviews SET reported = TRUE
       WHERE id = '${id}';`
     );
-    res.status(204).end();
+    res.sendStatus(204);
   } catch (err) {
     console.log(err);
     res.send(err);
