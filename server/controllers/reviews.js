@@ -2,13 +2,14 @@ const pool = require('../../db/postgresqldb.js')
 
 exports.getProductReviews = async (req, res) => {
   // console.log(req.query.product_id)
-  let id = req.query.product_id;
+  let id = req.query.product_id ? req.query.product_id: 71697;
   let page = req.query.page;
   let count = req.query.count;
   let sort = req.query.sort;
   let rowsToSkip = (page - 1) * count;
   try {
-  let result = await pool.query(`SELECT id AS review_id, rating, summary, recommend, response, body, date, reviewer_name, helpfulness FROM reviews WHERE product_id = '${id}' LIMIT '${count}' OFFSET '${rowsToSkip}'`);
+  if (sort === 'newest') {
+  let result = await pool.query(`SELECT id AS review_id, rating, summary, recommend, response, body, date, reviewer_name, helpfulness FROM reviews WHERE product_id = '${id}' ORDER BY date DESC OFFSET '${rowsToSkip}' LIMIT '${count}'`);
   // console.log('result.rows', result.rows)
   let reviews = result.rows;
   for (let review of reviews) {
@@ -27,6 +28,27 @@ exports.getProductReviews = async (req, res) => {
   }
   // console.log('finalReviewResponse', finalReviewResponse)
   res.status(200).send(finalReviewResponse);
+} else {
+  let result = await pool.query(`SELECT id AS review_id, rating, summary, recommend, response, body, date, reviewer_name, helpfulness FROM reviews WHERE product_id = '${id}' ORDER BY helpfulness DESC OFFSET '${rowsToSkip}' LIMIT '${count}'`);
+  // console.log('result.rows', result.rows)
+  let reviews = result.rows;
+  for (let review of reviews) {
+    let photoUrl = await pool.query(`SELECT id, photo_url from reviews_photos WHERE review_id = '${review.review_id}'`);
+    // console.log('photoUrl.rows', photoUrl.rows);
+    review['photos'] = [...photoUrl.rows];
+    let date = new Date(Number(review['date']))
+    let formattedDate = date.toISOString()
+    review['date'] = formattedDate;
+  };
+  let finalReviewResponse = {
+    'product': id,
+    'page': Number(page),
+    'count': Number(count),
+    'results': [...reviews]
+  }
+  // console.log('finalReviewResponse', finalReviewResponse)
+  res.status(200).send(finalReviewResponse);
+}
   } catch (err) {
     // console.log(err);
     res.send(err);
@@ -35,10 +57,11 @@ exports.getProductReviews = async (req, res) => {
 
 
 exports.getProductMeta = async (req, res) => {
-  let id = req.query.product_id;
+  console.log('req.query.product_id',req.query.product_id)
+  let id = req.query.product_id ;
   let finalMetaResponse = {
     "product_id": id,
-    "ratings": {},
+    "ratings": {1: '0', 2: '0', 3: '0', 4: '0', 5: '0'},
     "recommended": {},
     "characteristics": {}
   };
@@ -64,7 +87,7 @@ exports.getProductMeta = async (req, res) => {
 
   res.status(200).send(finalMetaResponse);
   } catch (err) {
-    // console.log(err);
+    console.log(err);
     res.send(err);
   }
 };
