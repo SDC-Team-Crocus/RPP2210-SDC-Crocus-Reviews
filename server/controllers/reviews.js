@@ -2,7 +2,7 @@ const pool = require('../../db/postgresqldb.js')
 
 exports.getProductReviews = async (req, res) => {
   // console.log(req.query.product_id)
-  let id = req.query.product_id ? req.query.product_id: 71697;
+  let id = req.query.product_id;
   let page = req.query.page;
   let count = req.query.count;
   let sort = req.query.sort;
@@ -57,7 +57,7 @@ exports.getProductReviews = async (req, res) => {
 
 
 exports.getProductMeta = async (req, res) => {
-  console.log('req.query.product_id',req.query.product_id)
+  // console.log('req.query.product_id',req.query.product_id)
   let id = req.query.product_id ;
   let finalMetaResponse = {
     "product_id": id,
