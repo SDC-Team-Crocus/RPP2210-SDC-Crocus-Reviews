@@ -3,3 +3,5 @@ package-lock.json
 coverage
 *.csv
 *.pem
+*.rdb
+*.txt

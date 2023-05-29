@@ -1,8 +1,9 @@
 const express = require('express');
 const app = express();
-const port = 5000;
+const port = 5500;
 const path = require('path');
 const reviewsRoutes = require('./routes/reviews.js')
+
 
 //middleware to handle the CORS error
 app.use((re1, res, next) => {
@@ -11,6 +12,7 @@ app.use((re1, res, next) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   next();
 })
+
 
 app.use(express.json());
 // app.use(express.urlencoded({ extended: true }));
