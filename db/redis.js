@@ -3,10 +3,17 @@ const redis = require('ioredis');
 const redisClient = redis.createClient({
   host:'172.17.0.3', //ip address of the redis container
   port: 6379,
-  postword: 'password'
+  password: 'password'
 });
 
-// const redisClient = redis.createClient();
+// const redisClient = redis.createClient({
+//       // host:'localhost', //ip address of the redis container
+//       // port: 6379
+//       host:'172.17.0.3',
+//       port: 6379,
+// });
+
+
 
 const expiration = 36000;
 
