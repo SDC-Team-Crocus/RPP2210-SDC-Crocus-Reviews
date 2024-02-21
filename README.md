@@ -21,7 +21,7 @@ Created Database and Tables.
 
 ![image](https://drive.google.com/uc?export=view&id=1r1EYt8RaCSg8TzDf7LChGMZtUq_p4iwJ)
 
-Complete the STL process to load the data into PostgreSQL database.
+Complete the ETL process to load the data into PostgreSQL database.
 
 ![image](https://drive.google.com/uc?export=view&id=17FTwuO0WSZYlP4Shd6yhyZ4jb6d0GGST).
 
