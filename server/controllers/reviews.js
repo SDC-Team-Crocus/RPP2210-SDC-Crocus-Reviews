@@ -2,118 +2,385 @@ const pool = require('../../db/postgresqldb.js')
 const redis = require('../../db/redis.js')
 
 exports.getProductReviews = async (req, res) => {
-
-  let id = req.query.product_id;
-  let page = req.query.page;
-  let count = req.query.count;
-  let sort = req.query.sort;
-  let rowsToSkip = (page - 1) * count;
-  // console.log('reviews cache hit')
+  const id = req.query.product_id;
+  const page = req.query.page;
+  const count = req.query.count;
+  const sort = req.query.sort;
+  const rowsToSkip = (page - 1) * count;
   try{
-  let finalResponse = await redis.getOrSetCache(`review?id=${id}&page=${page}&count=${count}&sort=${sort}`, async ()=>{
-    // console.log('reviews not cache hit')
-    try {
+      let finalResponse = await redis.getOrSetCache(`review?id=${id}&page=${page}&count=${count}&sort=${sort}`, async ()=>{
+      let orderColumn;
       if (sort === 'newest') {
-      let result = await pool.query(`SELECT id AS review_id, rating, summary, recommend, response, body, date, reviewer_name, helpfulness FROM reviews WHERE product_id = '${id}' ORDER BY date DESC OFFSET '${rowsToSkip}' LIMIT '${count}'`);
-      // console.log('result.rows', result.rows)
-      let reviews = result.rows;
-      for (let review of reviews) {
-        let photoUrl = await pool.query(`SELECT id, photo_url from reviews_photos WHERE review_id = '${review.review_id}'`);
-        // console.log('photoUrl.rows', photoUrl.rows);
-        review['photos'] = [...photoUrl.rows];
-        let date = new Date(Number(review['date']))
-        let formattedDate = date.toISOString()
-        review['date'] = formattedDate;
-      };
-      let finalReviewResponse = {
-        'product': id,
-        'page': Number(page),
-        'count': Number(count),
-        'results': [...reviews]
+        orderColumn = 'r.date DESC';
+      } else {
+        orderColumn = 'r.helpfulness DESC';
       }
-      // console.log('finalReviewResponse', finalReviewResponse)
-      // res.status(200).send(finalReviewResponse);
-      return finalReviewResponse;
-    } else {
-      let result = await pool.query(`SELECT id AS review_id, rating, summary, recommend, response, body, date, reviewer_name, helpfulness FROM reviews WHERE product_id = '${id}' ORDER BY helpfulness DESC OFFSET '${rowsToSkip}' LIMIT '${count}'`);
-      // console.log('result.rows', result.rows)
-      let reviews = result.rows;
-      for (let review of reviews) {
-        let photoUrl = await pool.query(`SELECT id, photo_url from reviews_photos WHERE review_id = '${review.review_id}'`);
-        // console.log('photoUrl.rows', photoUrl.rows);
-        review['photos'] = [...photoUrl.rows];
-        let date = new Date(Number(review['date']))
-        let formattedDate = date.toISOString()
-        review['date'] = formattedDate;
+
+      const reviewsQuery = `
+      SELECT
+      r.id AS review_id,
+      r.rating,
+      r.summary,
+      r.recommend,
+      r.response
+      r.body,
+      r.date,
+      r.reviewer_name,
+      r.helpfulness,
+      COALESCE(json_agg(json_build_object('id', rp.id, 'photo_url', rp.photo_url)), '[]') AS photos
+      FROM
+      reviews AS r
+      LEFT JOIN reviews_photos AS rp ON r.id = rp.review_id
+    WHERE
+      r.product_id = $1
+    GROUP BY
+      r.id
+    ORDER BY
+      ${orderColumn}
+    OFFSET $2
+    LIMIT $3
+    `;
+      // const reviewsQuery = `
+      //   SELECT
+      //     r.id AS review_id,
+      //     r.rating,
+      //     r.summary,
+      //     r.recommend,
+      //     r.response,
+      //     r.body,
+      //     r.date,
+      //     r.reviewer_name,
+      //     r.helpfulness,
+      //     COALESCE(json_agg(json_build_object('id', rp.id, 'photo_url', rp.photo_url)), '[]') AS photos
+      //   FROM
+      //     reviews AS r
+      //     LEFT JOIN reviews_photos AS rp ON r.id = rp.review_id
+      //   WHERE
+      //     r.product_id = $1
+      //   GROUP BY
+      //     r.id
+      //   ORDER BY
+      //     ${orderColumn}
+      //   OFFSET $2
+      //   LIMIT $3
+      // `;
+
+      const result = await pool.query(reviewsQuery, [id, rowsToSkip, count]);
+      console.log('reviewsQuery ===>>>>>', result.rows)
+      const reviews = result.rows.map((row) => {
+        const formattedDate = new Date(Number(row.date)).toISOString();
+        return {
+          review_id: row.review_id,
+          rating: row.rating,
+          summary: row.summary,
+          recommend: row.recommend,
+          response: row.response,
+          body: row.body,
+          date: formattedDate,
+          reviewer_name: row.reviewer_name,
+          helpfulness: row.helpfulness,
+          photos: row.photos[0]['id'] === null? []:row.photos
+        };
+      });
+
+      const finalReviewResponse = {
+        product: id,
+        page: Number(page),
+        count: Number(count),
+        results: reviews
       };
-      let finalReviewResponse = {
-        'product': id,
-        'page': Number(page),
-        'count': Number(count),
-        'results': [...reviews]
-      }
-      // console.log('finalReviewResponse', finalReviewResponse)
+
       return finalReviewResponse;
-      // res.status(200).send(finalReviewResponse);
-    }
+  });
+    res.status(200).send(finalResponse);
     } catch (err) {
       console.log(err);
-      return err;
+      res.send(err);
     }
-  }
-  )
-  // console.log('finalResponse', finalResponse)
-  res.status(200).send(finalResponse);
-} catch (err) {
-  console.log(err);
-  res.send(err);;
-}
 };
+
+
+// //with caching before query optimization
+// exports.getProductReviews = async (req, res) => {
+
+//   let id = req.query.product_id;
+//   let page = req.query.page;
+//   let count = req.query.count;
+//   let sort = req.query.sort;
+//   let rowsToSkip = (page - 1) * count;
+//   // console.log('reviews cache hit')
+//   try{
+//   let finalResponse = await redis.getOrSetCache(`review?id=${id}&page=${page}&count=${count}&sort=${sort}`, async ()=>{
+//     // console.log('reviews not cache hit')
+//       if (sort === 'newest') {
+//       let result = await pool.query(`SELECT id AS review_id, rating, summary, recommend, response, body, date, reviewer_name, helpfulness FROM reviews WHERE product_id = '${id}' ORDER BY date DESC OFFSET '${rowsToSkip}' LIMIT '${count}'`);
+//       // console.log('result.rows', result.rows)
+//       let reviews = result.rows;
+//       for (let review of reviews) {
+//         let photoUrl = await pool.query(`SELECT id, photo_url from reviews_photos WHERE review_id = '${review.review_id}'`);
+//         // console.log('photoUrl.rows', photoUrl.rows);
+//         review['photos'] = [...photoUrl.rows];
+//         let date = new Date(Number(review['date']))
+//         let formattedDate = date.toISOString()
+//         review['date'] = formattedDate;
+//       };
+//       let finalReviewResponse = {
+//         'product': id,
+//         'page': Number(page),
+//         'count': Number(count),
+//         'results': [...reviews]
+//       }
+//       // console.log('finalReviewResponse', finalReviewResponse)
+//       // res.status(200).send(finalReviewResponse);
+//       return finalReviewResponse;
+//     } else {
+//       let result = await pool.query(`SELECT id AS review_id, rating, summary, recommend, response, body, date, reviewer_name, helpfulness FROM reviews WHERE product_id = '${id}' ORDER BY helpfulness DESC OFFSET '${rowsToSkip}' LIMIT '${count}'`);
+//       // console.log('result.rows', result.rows)
+//       let reviews = result.rows;
+//       for (let review of reviews) {
+//         let photoUrl = await pool.query(`SELECT id, photo_url from reviews_photos WHERE review_id = '${review.review_id}'`);
+//         // console.log('photoUrl.rows', photoUrl.rows);
+//         review['photos'] = [...photoUrl.rows];
+//         let date = new Date(Number(review['date']))
+//         let formattedDate = date.toISOString()
+//         review['date'] = formattedDate;
+//       };
+//       let finalReviewResponse = {
+//         'product': id,
+//         'page': Number(page),
+//         'count': Number(count),
+//         'results': [...reviews]
+//       }
+//       // console.log('finalReviewResponse', finalReviewResponse)
+//       return finalReviewResponse;
+//       // res.status(200).send(finalReviewResponse);
+//     }
+//   }
+//   )
+//   // console.log('finalResponse', finalResponse)
+//   res.status(200).send(finalResponse);
+// } catch (err) {
+//   console.log(err);
+//   res.send(err);
+// }
+// };
 
 
 exports.getProductMeta = async (req, res) => {
-  // console.log('req.query.product_id',req.query.product_id)
-  let id = req.query.product_id ;
-  let finalMetaResponse = {
-    "product_id": id,
-    "ratings": {},
-    "recommended": {},
-    "characteristics": {}
-  };
-  // console.log('meta cache hit')
+  const id = req.query.product_id;
+
   try {
-    let finalResponse = await redis.getOrSetCache(`reviews/meta?product_id=${id}`, async () => {
-      // console.log('meta not cache hit')
-      try {
-        let ratingResult = await pool.query(`SELECT rating, COUNT(*) as count FROM reviews WHERE product_id = '${id}' GROUP BY rating ORDER BY rating ASC;`);
-        for (let rating of ratingResult.rows) {
-          finalMetaResponse.ratings[rating.rating] = rating.count;
+    const finalResponse = await redis.getOrSetCache(`reviews/meta?product_id=${id}`, async () => {
+      const finalMetaResponse = {
+        product_id: id,
+        ratings: {},
+        recommended: {},
+        characteristics: {},
+      };
+
+      const [ratingResult, recommendResult, characteristicsResult] = await Promise.all([
+        pool.query({
+          text: 'SELECT rating, COUNT(*) as count FROM reviews WHERE product_id = $1 GROUP BY rating ORDER BY rating ASC;',
+          values: [id],
+        }),
+        pool.query({
+          text: 'SELECT recommend, COUNT(*) as count FROM reviews WHERE product_id = $1 GROUP BY recommend ORDER BY count ASC;',
+          values: [id],
+        }),
+        pool.query({
+          text: `SELECT c.id AS characteristic_id, c.name AS characteristic_name, AVG(cr.value) AS average_value
+                FROM characteristics c
+                INNER JOIN characteristic_reviews cr ON c.id = cr.characteristic_id
+                WHERE c.product_id = $1
+                GROUP BY c.id, c.name;`,
+          values: [id],
+        }),
+      ]);
+
+      for (let rating of ratingResult.rows) {
+        finalMetaResponse.ratings[rating.rating] = rating.count.toString();
+      }
+
+      for (let recommend of recommendResult.rows) {
+        finalMetaResponse.recommended[recommend.recommend.toString()] = recommend.count.toString();
+      }
+
+      for (let characteristic of characteristicsResult.rows) {
+        finalMetaResponse.characteristics[characteristic.characteristic_name] = {
+          id: characteristic.characteristic_id,
+          // value: characteristic.average_value.toFixed(16),
+          value: characteristic.average_value,
         };
-        let recommendResult = await pool.query(`SELECT recommend, COUNT(*) as count FROM reviews WHERE product_id = '${id}' GROUP BY recommend ORDER BY count ASC;`)
-        for (let recommend of recommendResult.rows) {
-          finalMetaResponse.recommended[recommend.recommend] = recommend.count;
-        };
-        let characteristicsResult = await pool.query (
-          `SELECT c.id AS characteristic_id, c.name AS characteristic_name, AVG(cr.value) AS average_value
-          FROM characteristics c
-          INNER JOIN characteristic_reviews cr ON c.id = cr.characteristic_id
-          WHERE c.product_id = '${id}'
-          GROUP BY c.id, c.name;`
-          );
-          for (let characteristic of characteristicsResult.rows) {
-            finalMetaResponse.characteristics[characteristic.characteristic_name] = {"id": characteristic.characteristic_id, "value": characteristic.average_value}
-          }
-       return finalMetaResponse;
-        } catch (err) {
-          console.log(err);
-          return err;
-        }
+      }
+      return finalMetaResponse;
     });
+
     res.status(200).send(finalResponse);
   } catch (err) {
+    console.log(err);
     res.send(err);
   }
 };
+
+
+// exports.getProductMeta = async (req, res) => {
+//   // console.log('req.query.product_id',req.query.product_id)
+//   let id = req.query.product_id ;
+//   let finalMetaResponse = {
+//     "product_id": id,
+//     "ratings": {},
+//     "recommended": {},
+//     "characteristics": {}
+//   };
+//   // console.log('meta cache hit')
+//   try {
+//     let finalResponse = await redis.getOrSetCache(`reviews/meta?product_id=${id}`, async () => {
+//       // console.log('meta not cache hit')
+//       try {
+//         let ratingResult = await pool.query(`SELECT rating, COUNT(*) as count FROM reviews WHERE product_id = '${id}' GROUP BY rating ORDER BY rating ASC;`);
+//         for (let rating of ratingResult.rows) {
+//           finalMetaResponse.ratings[rating.rating] = rating.count;
+//         };
+//         let recommendResult = await pool.query(`SELECT recommend, COUNT(*) as count FROM reviews WHERE product_id = '${id}' GROUP BY recommend ORDER BY count ASC;`)
+//         for (let recommend of recommendResult.rows) {
+//           finalMetaResponse.recommended[recommend.recommend] = recommend.count;
+//         };
+//         let characteristicsResult = await pool.query (
+//           `SELECT c.id AS characteristic_id, c.name AS characteristic_name, AVG(cr.value) AS average_value
+//           FROM characteristics c
+//           INNER JOIN characteristic_reviews cr ON c.id = cr.characteristic_id
+//           WHERE c.product_id = '${id}'
+//           GROUP BY c.id, c.name;`
+//           );
+//           for (let characteristic of characteristicsResult.rows) {
+//             finalMetaResponse.characteristics[characteristic.characteristic_name] = {"id": characteristic.characteristic_id, "value": characteristic.average_value}
+//           }
+//        return finalMetaResponse;
+//         } catch (err) {
+//           console.log(err);
+//           return err;
+//         }
+//     });
+//     res.status(200).send(finalResponse);
+//   } catch (err) {
+//     res.send(err);
+//   }
+// };
+
+// //without caching before query optimization
+// exports.getProductReviews = async (req, res) => {
+
+//   let id = req.query.product_id;
+//   let page = req.query.page;
+//   let count = req.query.count;
+//   let sort = req.query.sort;
+//   let rowsToSkip = (page - 1) * count;
+//   // console.log('reviews cache hit')
+//   // try{
+//   // let finalResponse = await redis.getOrSetCache(`review?id=${id}&page=${page}&count=${count}&sort=${sort}`, async ()=>{
+//   //   // console.log('reviews not cache hit')
+//     try {
+//       if (sort === 'newest') {
+//       let result = await pool.query(`SELECT id AS review_id, rating, summary, recommend, response, body, date, reviewer_name, helpfulness FROM reviews WHERE product_id = '${id}' ORDER BY date DESC OFFSET '${rowsToSkip}' LIMIT '${count}'`);
+//       // console.log('result.rows', result.rows)
+//       let reviews = result.rows;
+//       for (let review of reviews) {
+//         let photoUrl = await pool.query(`SELECT id, photo_url from reviews_photos WHERE review_id = '${review.review_id}'`);
+//         // console.log('photoUrl.rows', photoUrl.rows);
+//         review['photos'] = [...photoUrl.rows];
+//         let date = new Date(Number(review['date']))
+//         let formattedDate = date.toISOString()
+//         review['date'] = formattedDate;
+//       };
+//       let finalReviewResponse = {
+//         'product': id,
+//         'page': Number(page),
+//         'count': Number(count),
+//         'results': [...reviews]
+//       }
+//       // console.log('finalReviewResponse', finalReviewResponse)
+//       res.status(200).send(finalReviewResponse);
+//       // return finalReviewResponse;
+//     } else {
+//       let result = await pool.query(`SELECT id AS review_id, rating, summary, recommend, response, body, date, reviewer_name, helpfulness FROM reviews WHERE product_id = '${id}' ORDER BY helpfulness DESC OFFSET '${rowsToSkip}' LIMIT '${count}'`);
+//       // console.log('result.rows', result.rows)
+//       let reviews = result.rows;
+//       for (let review of reviews) {
+//         let photoUrl = await pool.query(`SELECT id, photo_url from reviews_photos WHERE review_id = '${review.review_id}'`);
+//         // console.log('photoUrl.rows', photoUrl.rows);
+//         review['photos'] = [...photoUrl.rows];
+//         let date = new Date(Number(review['date']))
+//         let formattedDate = date.toISOString()
+//         review['date'] = formattedDate;
+//       };
+//       let finalReviewResponse = {
+//         'product': id,
+//         'page': Number(page),
+//         'count': Number(count),
+//         'results': [...reviews]
+//       }
+//       // console.log('finalReviewResponse', finalReviewResponse)
+//       // return finalReviewResponse;
+//       res.status(200).send(finalReviewResponse);
+//     }
+//     // } catch (err) {
+//     //   console.log(err);
+//     //   return err;
+//     // }
+//   // }
+//   // )
+//   // console.log('finalResponse', finalResponse)
+//   // res.status(200).send(finalResponse);
+// } catch (err) {
+//   console.log(err);
+//   res.send(err);;
+// }
+// };
+
+
+// exports.getProductMeta = async (req, res) => {
+//   // console.log('req.query.product_id',req.query.product_id)
+//   let id = req.query.product_id ;
+//   let finalMetaResponse = {
+//     "product_id": id,
+//     "ratings": {},
+//     "recommended": {},
+//     "characteristics": {}
+//   };
+//   // console.log('meta cache hit')
+//   // try {
+//   //   let finalResponse = await redis.getOrSetCache(`reviews/meta?product_id=${id}`, async () => {
+//   //     // console.log('meta not cache hit')
+//       try {
+//         let ratingResult = await pool.query(`SELECT rating, COUNT(*) as count FROM reviews WHERE product_id = '${id}' GROUP BY rating ORDER BY rating ASC;`);
+//         for (let rating of ratingResult.rows) {
+//           finalMetaResponse.ratings[rating.rating] = rating.count;
+//         };
+//         let recommendResult = await pool.query(`SELECT recommend, COUNT(*) as count FROM reviews WHERE product_id = '${id}' GROUP BY recommend ORDER BY count ASC;`)
+//         for (let recommend of recommendResult.rows) {
+//           finalMetaResponse.recommended[recommend.recommend] = recommend.count;
+//         };
+//         let characteristicsResult = await pool.query (
+//           `SELECT c.id AS characteristic_id, c.name AS characteristic_name, AVG(cr.value) AS average_value
+//           FROM characteristics c
+//           INNER JOIN characteristic_reviews cr ON c.id = cr.characteristic_id
+//           WHERE c.product_id = '${id}'
+//           GROUP BY c.id, c.name;`
+//           );
+//           for (let characteristic of characteristicsResult.rows) {
+//             finalMetaResponse.characteristics[characteristic.characteristic_name] = {"id": characteristic.characteristic_id, "value": characteristic.average_value}
+//           }
+//       //  return finalMetaResponse;
+//     //     } catch (err) {
+//     //       console.log(err);
+//     //       return err;
+//     //     }
+//     // });
+//     res.status(200).send(finalMetaResponse);
+//   } catch (err) {
+//     res.send(err);
+//   }
+// };
 
 
 exports.postNewReview = async (req, res) => {
@@ -140,24 +407,19 @@ exports.postNewReview = async (req, res) => {
   RETURNING id;`
   );
   let newReviewId = result.rows[0]["id"];
-  // console.log('reviews insert success!')
-  // console.log('newReviewId', newReviewId.rows[0]["id"])
   for (let photo of newReview.photos) {
     await pool.query(
     `INSERT INTO reviews_photos (review_id, photo_url)
     VALUES ('${newReviewId}', '${photo}')`
     );
   };
-  // console.log('reviews photos insert success!')
   for (let characteristicId in newReview.characteristics) {
     await pool.query(
     `INSERT INTO characteristic_reviews (characteristic_id, review_id, value)
     VALUES ('${characteristicId}', '${newReviewId}', '${newReview.characteristics[characteristicId]}')`
     );
   };
-  // console.log('reviews characs insert success!')
   res.sendStatus(201);
-  // res.status(201).send('Your review has been successfully posted!');
  } catch (err) {
   console.log(err);
   res.send(err);
