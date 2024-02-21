@@ -29,7 +29,7 @@ Write and run JEST tests to test controllers and routers.
 
 ![image](https://drive.google.com/uc?export=view&id=1kJLhG1R_YWpF8hiua9gaFFYuyL3PWG9K)
 
-Write and run JEST tests to test controllers and routers.
+API routes
 
 ![image](https://drive.google.com/uc?export=view&id=1hk76JAZO6lDUq2q-CMssz-4EmHBnb-n1)
 
