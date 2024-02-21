@@ -23,19 +23,19 @@ Created Database and Tables.
 
 Complete the STL process to load the data into PostgreSQL database.
 
-![image](https://drive.google.com/file/d/17FTwuO0WSZYlP4Shd6yhyZ4jb6d0GGST/view).
+![image](https://drive.google.com/uc?export=view&id=17FTwuO0WSZYlP4Shd6yhyZ4jb6d0GGST).
 
 Write and run JEST tests to test controllers and routers.
 
-![image](https://drive.google.com/file/d/1kJLhG1R_YWpF8hiua9gaFFYuyL3PWG9K/view)
+![image](https://drive.google.com/uc?export=view&id=1kJLhG1R_YWpF8hiua9gaFFYuyL3PWG9K)
 
 Write and run JEST tests to test controllers and routers.
 
-![image](https://drive.google.com/file/d/1hk76JAZO6lDUq2q-CMssz-4EmHBnb-n1/view?usp=sharing)
+![image](https://drive.google.com/uc?export=view&id=1hk76JAZO6lDUq2q-CMssz-4EmHBnb-n1)
 
 K6 stress test before and after database indexing - huge improvement for the API performace
 
-![image](https://drive.google.com/file/d/16b3175D0Q5TJFNOxwdxL8GbK4hBkdmPD/view?usp=sharing)
+![image](https://drive.google.com/uc?export=view&id=16b3175D0Q5TJFNOxwdxL8GbK4hBkdmPD)
 
 Use docker to deploy 1 Nginx load balancer, 3 servers (each with redis caching) and 1 PostgreSQL database to AWS EC2 instances (5 EC2 instances in total) - run loader.io stress test 2000 requests per second
 
@@ -43,5 +43,5 @@ Use docker to deploy 1 Nginx load balancer, 3 servers (each with redis caching) 
 
 After optimizing the query, the deployed API can reach 4000 requests per second
 
-![image](https://drive.google.com/file/d/15cuzWtJ6Si7_FxweU2dOvYSAnk0I9REI/view?usp=sharing)
+![image](https://drive.google.com/uc?export=view&id=15cuzWtJ6Si7_FxweU2dOvYSAnk0I9REI)
 
